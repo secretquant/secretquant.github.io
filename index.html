@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Secret Quant — Crypto Trading</title>
+<meta name="description" content="Systematic crypto trading. The full site is coming."/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+
+:root{
+  --hot:#FF3D00;
+  --mid:#FF7300;
+  --warm:#FFAA00;
+  --coal:#050505;
+  --ash:#0e0e0e;
+  --text:#EBEBEB;
+  --muted:rgba(255,255,255,0.28);
+}
+
+html,body{
+  width:100%;height:100%;
+  overflow:hidden;
+  background:var(--coal);
+  color:var(--text);
+  font-family:'Share Tech Mono','Courier New',monospace;
+  cursor:crosshair;
+}
+
+#fire-canvas{
+  position:fixed;inset:0;
+  width:100%;height:100%;
+  pointer-events:none;z-index:0;
+}
+
+#grid{
+  position:fixed;inset:0;pointer-events:none;z-index:1;
+  background-image:
+    linear-gradient(rgba(255,115,0,0.045) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,115,0,0.045) 1px,transparent 1px);
+  background-size:60px 60px;
+  animation:gridpulse 9s ease-in-out infinite;
+}
+@keyframes gridpulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+
+#vignette{
+  position:fixed;inset:0;pointer-events:none;z-index:2;
+  background:radial-gradient(ellipse 90% 80% at 50% 50%,transparent 35%,rgba(5,5,5,0.88) 100%);
+}
+
+#scan{
+  position:fixed;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,rgba(255,115,0,0.2),transparent);
+  z-index:3;pointer-events:none;top:-2px;
+  animation:scanmove 7s linear infinite;
+}
+@keyframes scanmove{0%{top:-2px;}100%{top:100vh;}}
+
+.ticker-wrap{
+  position:fixed;left:0;right:0;overflow:hidden;
+  z-index:10;height:30px;display:flex;align-items:center;
+  background:rgba(5,5,5,0.75);backdrop-filter:blur(6px);
+}
+.ticker-wrap.top{top:0;border-bottom:1px solid rgba(255,115,0,0.18);}
+.ticker-wrap.bot{bottom:0;border-top:1px solid rgba(255,115,0,0.18);}
+.ticker-track{display:flex;white-space:nowrap;will-change:transform;}
+.ticker-wrap.top .ticker-track{animation:tickL 30s linear infinite;}
+.ticker-wrap.bot .ticker-track{animation:tickR 24s linear infinite;}
+@keyframes tickL{0%{transform:translateX(0);}100%{transform:translateX(-50%);}}
+@keyframes tickR{0%{transform:translateX(-50%);}100%{transform:translateX(0);}}
+.t-item{font-size:9px;letter-spacing:0.24em;text-transform:uppercase;color:var(--muted);padding:0 2rem;}
+.t-item em{color:var(--mid);font-style:normal;margin-right:0.4rem;}
+
+.corner{position:fixed;width:20px;height:20px;z-index:10;pointer-events:none;}
+.corner.tl{top:36px;left:14px;border-top:1px solid var(--mid);border-left:1px solid var(--mid);}
+.corner.tr{top:36px;right:14px;border-top:1px solid var(--mid);border-right:1px solid var(--mid);}
+.corner.bl{bottom:36px;left:14px;border-bottom:1px solid var(--mid);border-left:1px solid var(--mid);}
+.corner.br{bottom:36px;right:14px;border-bottom:1px solid var(--mid);border-right:1px solid var(--mid);}
+
+.side{
+  position:fixed;top:50%;pointer-events:none;z-index:10;
+  font-size:8px;letter-spacing:0.32em;text-transform:uppercase;
+  color:rgba(255,115,0,0.18);white-space:nowrap;
+}
+.side.l{left:-40px;transform:translateY(-50%) rotate(-90deg);}
+.side.r{right:-40px;transform:translateY(-50%) rotate(90deg);}
+
+#stage{
+  position:fixed;inset:0;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  z-index:20;padding:52px 2rem;gap:0;
+}
+
+.status-row{
+  display:flex;align-items:center;gap:1rem;
+  margin-bottom:2.2rem;
+  animation:rise 1.2s ease both;
+}
+.pulse-dot{
+  width:7px;height:7px;border-radius:50%;
+  background:var(--hot);box-shadow:0 0 8px var(--hot);
+  animation:pulsedot 2s ease-in-out infinite;
+}
+@keyframes pulsedot{
+  0%,100%{box-shadow:0 0 6px var(--hot);opacity:1;}
+  50%{box-shadow:0 0 20px var(--hot),0 0 36px rgba(255,61,0,0.3);opacity:0.65;}
+}
+.status-txt{font-size:9px;letter-spacing:0.3em;text-transform:uppercase;color:var(--hot);}
+.status-line{width:36px;height:1px;background:linear-gradient(90deg,var(--hot),transparent);}
+
+.hero-name{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:clamp(76px,18vw,196px);
+  line-height:0.88;letter-spacing:0.03em;text-align:center;
+  animation:rise 1.4s ease 0.15s both;
+}
+.name-fire{
+  display:block;
+  background:linear-gradient(108deg,var(--hot) 0%,var(--mid) 38%,var(--warm) 72%,var(--mid) 100%);
+  background-size:200% 100%;
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  animation:fireshift 4s ease-in-out infinite alternate, flicker 8s ease-in-out infinite;
+}
+.name-ghost{
+  display:block;
+  -webkit-text-fill-color:transparent;
+  -webkit-text-stroke:1px rgba(255,115,0,0.28);
+}
+@keyframes fireshift{0%{background-position:0% 0%;}100%{background-position:100% 0%;}}
+@keyframes flicker{
+  0%,100%{opacity:1;}46%{opacity:1;}50%{opacity:0.82;}54%{opacity:1;}
+  74%{opacity:1;}77%{opacity:0.9;}80%{opacity:1;}
+}
+
+.fire-rule{
+  width:clamp(100px,26vw,300px);height:1px;margin:1.5rem 0;
+  background:linear-gradient(90deg,transparent,var(--hot),var(--warm),var(--hot),transparent);
+  background-size:200% 100%;
+  animation:ruleflow 3s linear infinite, rise 1.4s ease 0.4s both;
+}
+@keyframes ruleflow{0%{background-position:0%;}100%{background-position:200%;}}
+
+.tagline{
+  font-size:clamp(9px,1.3vw,12px);letter-spacing:0.24em;
+  text-transform:uppercase;color:var(--muted);
+  text-align:center;max-width:380px;line-height:2.1;
+  animation:rise 1.4s ease 0.6s both;
+}
+
+.countdown{
+  margin-top:2.2rem;display:flex;
+  gap:clamp(0.8rem,2.5vw,2rem);align-items:flex-start;
+  animation:rise 1.4s ease 0.8s both;
+}
+.cb{text-align:center;min-width:52px;}
+.cn{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:clamp(40px,7vw,68px);color:var(--warm);
+  line-height:1;letter-spacing:0.06em;display:block;
+}
+.cl{
+  font-size:8px;letter-spacing:0.24em;text-transform:uppercase;
+  color:rgba(255,115,0,0.38);display:block;margin-top:0.25rem;
+}
+.csep{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:clamp(40px,7vw,68px);
+  color:rgba(255,115,0,0.18);line-height:1;
+}
+
+#clock{
+  font-size:10px;letter-spacing:0.2em;
+  color:rgba(255,115,0,0.28);margin-top:0.5rem;
+  animation:rise 1.4s ease 0.95s both;
+}
+
+.cta-row{
+  margin-top:2.2rem;display:flex;gap:1rem;flex-wrap:wrap;
+  justify-content:center;animation:rise 1.4s ease 1.05s both;
+}
+.btn-fire{
+  display:inline-flex;align-items:center;gap:0.55rem;
+  padding:0.85rem 2.1rem;background:var(--hot);color:#fff;
+  font-family:'Share Tech Mono',monospace;font-size:9px;
+  letter-spacing:0.24em;text-transform:uppercase;
+  text-decoration:none;border:none;cursor:pointer;
+  transition:background 0.2s,transform 0.15s,box-shadow 0.2s;
+  position:relative;overflow:hidden;
+}
+.btn-fire::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.14),transparent);
+  transform:translateX(-100%);transition:transform 0.42s;
+}
+.btn-fire:hover::before{transform:translateX(100%);}
+.btn-fire:hover{background:var(--mid);transform:translateY(-2px);box-shadow:0 8px 30px rgba(255,61,0,0.32);}
+.btn-ghost{
+  display:inline-flex;align-items:center;gap:0.55rem;
+  padding:0.85rem 2.1rem;background:transparent;color:var(--mid);
+  font-family:'Share Tech Mono',monospace;font-size:9px;
+  letter-spacing:0.24em;text-transform:uppercase;
+  text-decoration:none;border:1px solid rgba(255,115,0,0.32);cursor:pointer;
+  transition:border-color 0.2s,background 0.2s,transform 0.15s;
+}
+.btn-ghost:hover{border-color:var(--mid);background:rgba(255,115,0,0.07);transform:translateY(-2px);}
+
+@keyframes rise{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+
+@media(max-width:560px){
+  .side{display:none;}
+  .countdown{gap:0.7rem;}
+  .cta-row{flex-direction:column;align-items:center;}
+  .btn-fire,.btn-ghost{width:220px;justify-content:center;}
+}
+</style>
+</head>
+<body>
+
+<canvas id="fire-canvas"></canvas>
+<div id="grid"></div>
+<div id="vignette"></div>
+<div id="scan"></div>
+
+<div class="corner tl"></div>
+<div class="corner tr"></div>
+<div class="corner bl"></div>
+<div class="corner br"></div>
+<div class="side l">Quant Trading &nbsp;·&nbsp; Crypto Markets &nbsp;·&nbsp; Systematic Strategy</div>
+<div class="side r">Risk Adjusted Returns &nbsp;·&nbsp; Data Driven &nbsp;·&nbsp; High Conviction</div>
+
+<div class="ticker-wrap top"><div class="ticker-track">
+  <div class="t-item"><em>▸</em>Systematic Trading</div><div class="t-item"><em>▸</em>Crypto Quant</div>
+  <div class="t-item"><em>▸</em>Algo Strategies</div><div class="t-item"><em>▸</em>Risk Management</div>
+  <div class="t-item"><em>▸</em>Market Structure</div><div class="t-item"><em>▸</em>Edge Discovery</div>
+  <div class="t-item"><em>▸</em>Capital Efficiency</div><div class="t-item"><em>▸</em>Drawdown Control</div>
+  <div class="t-item"><em>▸</em>Backtesting Mastery</div><div class="t-item"><em>▸</em>Live Execution</div>
+  <div class="t-item"><em>▸</em>Position Sizing</div><div class="t-item"><em>▸</em>Volatility Models</div>
+  <div class="t-item"><em>▸</em>Systematic Trading</div><div class="t-item"><em>▸</em>Crypto Quant</div>
+  <div class="t-item"><em>▸</em>Algo Strategies</div><div class="t-item"><em>▸</em>Risk Management</div>
+  <div class="t-item"><em>▸</em>Market Structure</div><div class="t-item"><em>▸</em>Edge Discovery</div>
+  <div class="t-item"><em>▸</em>Capital Efficiency</div><div class="t-item"><em>▸</em>Drawdown Control</div>
+  <div class="t-item"><em>▸</em>Backtesting Mastery</div><div class="t-item"><em>▸</em>Live Execution</div>
+  <div class="t-item"><em>▸</em>Position Sizing</div><div class="t-item"><em>▸</em>Volatility Models</div>
+</div></div>
+
+<div class="ticker-wrap bot"><div class="ticker-track">
+  <div class="t-item"><em>◆</em>BTC · ETH · SOL · USDT</div>
+  <div class="t-item"><em>◆</em>High Frequency · Swing · Trend</div>
+  <div class="t-item"><em>◆</em>Funded &amp; Independent</div>
+  <div class="t-item"><em>◆</em>No Guessing. Only Data.</div>
+  <div class="t-item"><em>◆</em>1-on-1 Consultation Available</div>
+  <div class="t-item"><em>◆</em>Premium Course Coming</div>
+  <div class="t-item"><em>◆</em>Crypto-Only Payment</div>
+  <div class="t-item"><em>◆</em>Follow @secretquant on X</div>
+  <div class="t-item"><em>◆</em>BTC · ETH · SOL · USDT</div>
+  <div class="t-item"><em>◆</em>High Frequency · Swing · Trend</div>
+  <div class="t-item"><em>◆</em>Funded &amp; Independent</div>
+  <div class="t-item"><em>◆</em>No Guessing. Only Data.</div>
+  <div class="t-item"><em>◆</em>1-on-1 Consultation Available</div>
+  <div class="t-item"><em>◆</em>Premium Course Coming</div>
+  <div class="t-item"><em>◆</em>Crypto-Only Payment</div>
+  <div class="t-item"><em>◆</em>Follow @secretquant on X</div>
+</div></div>
+
+<div id="stage">
+
+  <div class="status-row">
+    <div class="status-line" style="transform:scaleX(-1)"></div>
+    <div class="pulse-dot"></div>
+    <div class="status-txt">Site Launching Soon</div>
+    <div class="pulse-dot"></div>
+    <div class="status-line"></div>
+  </div>
+
+  <h1 class="hero-name">
+    <span class="name-fire">Secret Quant</span>
+    <span class="name-ghost">Crypto Markets</span>
+  </h1>
+
+  <div class="fire-rule"></div>
+
+  <p class="tagline">
+    Quant Trading &nbsp;·&nbsp; Crypto Markets<br/>
+    The full site is being built.<br/>
+    Something serious is coming.
+  </p>
+
+  <div class="countdown">
+    <div class="cb"><span class="cn" id="cd-d">00</span><span class="cl">Days</span></div>
+    <div class="csep">:</div>
+    <div class="cb"><span class="cn" id="cd-h">00</span><span class="cl">Hrs</span></div>
+    <div class="csep">:</div>
+    <div class="cb"><span class="cn" id="cd-m">00</span><span class="cl">Min</span></div>
+    <div class="csep">:</div>
+    <div class="cb"><span class="cn" id="cd-s">00</span><span class="cl">Sec</span></div>
+  </div>
+
+  <div id="clock">UTC — : — : —</div>
+
+  <div class="cta-row">
+    <a href="https://x.com/secretquant" target="_blank" rel="noopener noreferrer" class="btn-fire">Follow on X &nbsp;↗</a>
+    <a href="mailto:deltaquant33@protonmail.com" class="btn-ghost">Contact Me &nbsp;→</a>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  const cv=document.getElementById('fire-canvas'),ctx=cv.getContext('2d');
+  let W,H;
+  function resize(){W=cv.width=window.innerWidth;H=cv.height=window.innerHeight;}
+  resize();window.addEventListener('resize',resize);
+  const COLS=[[255,61,0],[255,90,0],[255,115,0],[255,140,0],[255,165,0],[255,195,25]];
+  function mkP(init){
+    return{
+      x:Math.random()*W,
+      y:init?Math.random()*H:H+8,
+      vx:(Math.random()-0.5)*0.65,
+      vy:-(Math.random()*1.3+0.45),
+      life:0,
+      max:Math.random()*190+90,
+      r:Math.random()*2.6+0.4,
+      ci:Math.floor(Math.random()*COLS.length)
+    };
+  }
+  const N=Math.min(320,Math.floor(window.innerWidth*0.22));
+  let ps=Array.from({length:N},()=>mkP(true));
+  function loop(){
+    ctx.clearRect(0,0,W,H);
+    for(let i=0;i<ps.length;i++){
+      let p=ps[i];
+      p.x+=p.vx+Math.sin(p.life*0.038)*0.28;
+      p.y+=p.vy;
+      p.life++;
+      if(p.life>p.max){ps[i]=mkP(false);continue;}
+      const t=p.life/p.max;
+      const a=t<0.18?t/0.18:1-((t-0.18)/0.82);
+      const ci=Math.min(p.ci+Math.floor(t*2.5),COLS.length-1);
+      const[r,g,b]=COLS[ci];
+      ctx.save();
+      ctx.globalAlpha=a*0.72;
+      ctx.fillStyle=`rgb(${r},${g},${b})`;
+      ctx.shadowBlur=p.r*5;
+      ctx.shadowColor=`rgba(${r},${g},${b},0.55)`;
+      ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
+      ctx.restore();
+    }
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+(function(){
+  const TARGET=new Date('2026-04-28T00:00:00');
+  const pad=n=>String(n).padStart(2,'0');
+  function tick(){
+    const diff=TARGET-new Date();
+    if(diff<=0){['cd-d','cd-h','cd-m','cd-s'].forEach(id=>document.getElementById(id).textContent='00');return;}
+    document.getElementById('cd-d').textContent=pad(Math.floor(diff/86400000));
+    document.getElementById('cd-h').textContent=pad(Math.floor(diff%86400000/3600000));
+    document.getElementById('cd-m').textContent=pad(Math.floor(diff%3600000/60000));
+    document.getElementById('cd-s').textContent=pad(Math.floor(diff%60000/1000));
+  }
+  tick();setInterval(tick,1000);
+})();
+
+(function(){
+  const el=document.getElementById('clock');
+  const p=n=>String(n).padStart(2,'0');
+  function tick(){
+    const n=new Date();
+    el.textContent=`UTC ${p(n.getUTCHours())}:${p(n.getUTCMinutes())}:${p(n.getUTCSeconds())}`;
+  }
+  tick();setInterval(tick,1000);
+})();
+</script>
+</body>
+</html>
